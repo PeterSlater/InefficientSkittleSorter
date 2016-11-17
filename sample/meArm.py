@@ -7,6 +7,16 @@ import kinematics
 import time
 from math import pi
 
+##TEST SERVO BASE
+import RPi.GPIO as GPIO
+import time
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(12, GPIO.OUT)
+pwm = GPIO.PWM(12, 50)
+pwm.start(7.5)
+
+
 class meArm():
     def __init__(self, sweepMinBase = 145, sweepMaxBase = 49, angleMinBase = -pi/4, angleMaxBase = pi/4,
     			 sweepMinShoulder = 118, sweepMaxShoulder = 22, angleMinShoulder = pi/4, angleMaxShoulder = 3*pi/4,
@@ -47,7 +57,29 @@ class meArm():
     
     def angle2pwm(self, servo, angle):
         """Work out pulse length to use to achieve a given requested angle taking into account stored calibration data"""
-    	ret = 150 + int(0.5 + (self.servoInfo[servo]["zero"] + self.servoInfo[servo]["gain"] * angle) * 450 / 180)
+        #Base rad [-1.09, 1.09] to mSec [1,2]
+        #OldRange = (OldMax - OldMin)
+        #NewRange = (NewMax - NewMin)
+        #NewValue = (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
+    	basePWM = 0 
+    	
+    	if( servo == "base"):
+	    	baseRadMin = -1.09
+	    	baseRadMax = 1.09
+	    	baseRadRange = baseRadMax - baseRadMin
+	    	basePWMmin = 2.5
+	    	basePWMmax = 10.0
+	    	basePWMrange = basePWMmax - basePWMmin
+	    	
+	    	basePWM = (( ( angle-baseRadMin )* basePWMrange)/ baseRadRange) + basePWMmin
+	    	print "basePWM: ",  basePWM
+	    	
+	    	pwm.ChangeDutyCycle(basePWM)
+	    	
+    	
+    	
+    	ret = basePWM
+    	
     	return ret
     	
     def goDirectlyTo(self, x, y, z):
@@ -57,13 +89,16 @@ class meArm():
     		radBase = angles[0]
     		radShoulder = angles[1]
     		radElbow = angles[2]
+    		
+    		 
     		self.pwm.setPWM(self.base, 0, self.angle2pwm("base", radBase))
     		self.pwm.setPWM(self.shoulder, 0, self.angle2pwm("shoulder", radShoulder))
     		self.pwm.setPWM(self.elbow, 0, self.angle2pwm("elbow", radElbow))
     		self.x = x
     		self.y = y
     		self.z = z
-    		print "goto %s" % ([x,y,z])
+    		print "goto %s, radians %s" % ([x,y,z], [radBase, radShoulder, radElbow])
+    		
     		
     def gotoPoint(self, x, y, z):
         """Travel in a straight line from current position to a requested position"""
