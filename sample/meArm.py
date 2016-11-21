@@ -12,11 +12,26 @@ import RPi.GPIO as GPIO
 import time
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
+GPIO.setup(18, GPIO.OUT)
+pwmB = GPIO.PWM(18, 50)
+pwmB.start(7.5)
+
+##TEST SERVO Shoulder
+GPIO.setmode(GPIO.BCM)
 GPIO.setup(12, GPIO.OUT)
-pwm = GPIO.PWM(12, 50)
-pwm.start(7.5)
+pwmS = GPIO.PWM(12, 50)
+pwmS.start(7.5)
 
 
+##TEST SERVO Elbow
+GPIO.setup(23, GPIO.OUT)
+pwmE = GPIO.PWM(23, 50)
+pwmE.start(7.5)
+
+basePWM = 0 
+shoulderPWM = 0
+elbowPWM = 0
+    	
 class meArm():
     def __init__(self, sweepMinBase = 145, sweepMaxBase = 49, angleMinBase = -pi/4, angleMaxBase = pi/4,
     			 sweepMinShoulder = 118, sweepMaxShoulder = 22, angleMinShoulder = pi/4, angleMaxShoulder = 3*pi/4,
@@ -61,7 +76,8 @@ class meArm():
         #OldRange = (OldMax - OldMin)
         #NewRange = (NewMax - NewMin)
         #NewValue = (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
-    	basePWM = 0 
+    	
+    	global basePWM, shoulderPWM, elbowPWM
     	
     	if( servo == "base"):
 	    	baseRadMin = -1.09
@@ -74,9 +90,35 @@ class meArm():
 	    	basePWM = (( ( angle-baseRadMin )* basePWMrange)/ baseRadRange) + basePWMmin
 	    	print "basePWM: ",  basePWM
 	    	
-	    	pwm.ChangeDutyCycle(basePWM)
+	    	pwmB.ChangeDutyCycle(basePWM)
 	    	
+    	if( servo == "shoulder"):
+	    	shoulderRadMin = 3.5
+	    	shoulderRadMax = 0.57
+	    	shoulderRadRange = shoulderRadMax - shoulderRadMin
+	    	shoulderPWMmin = 7.0
+	    	shoulderPWMmax = 11.0
+	    	shoulderPWMrange = shoulderPWMmax - shoulderPWMmin
+	    	
+	    	shoulderPWM = (( ( angle-shoulderRadMin )* shoulderPWMrange)/ shoulderRadRange) + shoulderPWMmin
+	    	print "shoulderPWM: ",  shoulderPWM
+	    	
+	    	pwmS.ChangeDutyCycle(shoulderPWM)
     	
+    	ret = basePWM
+    	
+    	if( servo == "elbow"):
+	    	elbowRadMin = 1.35
+	    	elbowRadMax = -0.19
+	    	elbowRadRange = elbowRadMax - elbowRadMin
+	    	elbowPWMmin = 5.5
+	    	elbowPWMmax = 8.0
+	    	elbowPWMrange = elbowPWMmax - elbowPWMmin
+	    	
+	    	elbowPWM = (( ( angle-elbowRadMin )* elbowPWMrange)/ elbowRadRange) + elbowPWMmin
+	    	print "elbowPWM: ",  elbowPWM
+	    	
+	    	pwmE.ChangeDutyCycle(elbowPWM)
     	
     	ret = basePWM
     	
@@ -98,7 +140,7 @@ class meArm():
     		self.y = y
     		self.z = z
     		print "goto %s, radians %s" % ([x,y,z], [radBase, radShoulder, radElbow])
-    		
+    		time.sleep(3)
     		
     def gotoPoint(self, x, y, z):
         """Travel in a straight line from current position to a requested position"""
@@ -113,7 +155,7 @@ class meArm():
     		time.sleep(0.05)
     		i += step
     	self.goDirectlyTo(x, y, z)
-    	time.sleep(0.05)
+    	time.sleep(3)
     	
     def openGripper(self):
         """Open the gripper, dropping whatever is being carried"""
