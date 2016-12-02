@@ -33,8 +33,11 @@ armDoneSort = 1
 #initiailize claw Position
 clawX = 290
 clawY = 360
-	
-	
+
+#defines
+clawGreenPixelSize = 100
+skittlePixelSize = 100 #set to 300 for demo
+
 #==================================
 #class Skittles
 #==================================
@@ -127,7 +130,7 @@ def imageProcess():
 		for c in contours:
 			
 			# only big enough size as valid
-			if cv2.contourArea(c) > 100:
+			if cv2.contourArea(c) > skittlePixelSize:
 			    # bound rectangle, w & h should be approx 1
 			    
 			    x,y,w,h = cv2.boundingRect(c)
@@ -142,7 +145,7 @@ def imageProcess():
 					cX = int(M["m10"]/M["m00"])
 					cY = int(M["m01"]/M["m00"])
 					
-					print "X: " ,cX, "Y: ", cY
+					#print "X: " ,cX, "Y: ", cY
 					
 					#draw circle
 					cv2.drawContours(image, [c], -1, (0,255,255), 2)
@@ -189,7 +192,8 @@ def getCenter( maskedFrame, previousX, previousY ):
 		
 		for c in contours:	
 			# only big enough size as valid
-			if cv2.contourArea(c) > 100:
+			#
+			if cv2.contourArea(c) > clawGreenPixelSize:
 				# bound rectangle, w & h should be approx 1
 				
 				x,y,w,h = cv2.boundingRect(c)
@@ -209,7 +213,7 @@ def getCenter( maskedFrame, previousX, previousY ):
 		newClawY = Y/2
 		
 		#compare with global value and update only if similar, else return same
-		if( ( abs(newClawX-previousX) + abs(newClawY-previousY) )  < 100 ):
+		if( ( abs(newClawX-previousX) + abs(newClawY-previousY) )  < 200 ):
 			return newClawX, newClawY
 			
 		else:
@@ -225,8 +229,8 @@ def getColorInput():
 	
 	greenLB = (50,100,0)
 	greenUB = (100,255,140)
-	yellowLB = (5,30,100)
-	yellowUB = (140,182,170)
+	yellowLB = (5,40,100)
+	yellowUB = (110,152,150)
 	redLB = (169,136,103)
 	redUB = (179,225,206)
 	
@@ -271,7 +275,7 @@ def printSkittleList( inputList ):
 #==================================
 def FSM():
 	
-	global state
+	global state, redSkittleList
 	
 	#=======IDLE========#
 	if state == 'IDLE':
@@ -291,34 +295,71 @@ def FSM():
 	elif state == 'INIT':
 		print "INIT"
 		
-		if ( (colorInput is 'g') or (colorInput is 'r') or (colorInput is 'y') ):
-			greenSkittleList = imageProcess()
-			#printSkittleList(greenSkittleList)
+		if ( (colorInput is 'r') ):
+			redSkittleList = imageProcess()
+			#printSkittleList(redSkittleList)
 			
-			#if(len(greenSkittleList) != 0):
-			#	printSkittleList(greenSkittleList)
-			#	state = 'SORT'
 			
-		#elif (colorInput is 'r'):
-			#redSkittleList = imageProcess()
-			#if(len(redSkittleList) != 0):
-				#printSkittleList(redSkittleList)
-				#state = 'SORT'
+			if(len(redSkittleList) != 0):
+				print "detected: ", len(redSkittleList), " red skittle"
+				
+				printSkittleList(redSkittleList)
+				state = 'SORT'
+			
+			else:
+				print "detected: 0 red skittle"
+				state = 'IDLE'
+				
+
 			
 
 	#=======SORT========#	
 	elif state == 'SORT':
 		print "SORT"
 		
-		tempSkittle = imageProcess()
+		#TODO: call img process again and get updated temp X,Y and Claw
 		
-		#change condition to include done state w/ ARM
-		if ( (len(tempSkittle) == 0) and (armDoneSort) ):
-			#state = 'IDLE'
-			pass
+		if ( (colorInput is 'r') ):
 			
-		else:
-			state = 'SORT'
+			#get x,y position of red skittles in the global list
+			for  skittle in  redSkittleList:
+				
+				
+				moveToPos = skittle.getPosition()
+				#print "position @ ", moveToPos
+				
+				#get delta X,Y from claw to skittle
+				deltaX = moveToPos[0] - clawX  
+				deltaY = clawY - moveToPos[1]
+				#convert deltaX,Y from pixel to robot x,y
+				
+				print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
+
+				if(deltaX > 0 and deltaY > 0):
+					print "move rightup"
+				
+				elif(deltaX > 0 and deltaY < 0):
+					print "move rightdown"
+					
+				elif(deltaX < 0 and deltaY > 0):
+					print "move leftup"
+				
+				elif(deltaX < 0 and deltaY < 0):
+					print "move leftdown"
+				
+				else: print "unknown delta!"
+		
+		#sleep(1)
+		
+		#tempSkittle = imageProcess()
+		
+		##change condition to include done state w/ ARM
+		#if ( (len(tempSkittle) == 0) and (armDoneSort) ):
+			##state = 'IDLE'
+			#pass
+			
+		#else:
+			#state = 'SORT'
 	
 
 			
