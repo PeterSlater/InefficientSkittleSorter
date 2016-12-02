@@ -1,37 +1,11 @@
 # meArm.py - York Hack Space May 2014
 # A motion control library for Phenoptix meArm using Adafruit 16-channel PWM servo driver
 
-import Adafruit_PWM_Servo_Driver
 from Adafruit_PWM_Servo_Driver import PWM
 import kinematics
 import time
 from math import pi
 
-##TEST SERVO BASE
-import RPi.GPIO as GPIO
-import time
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(18, GPIO.OUT)
-pwmB = GPIO.PWM(18, 50)
-pwmB.start(7.5)
-
-##TEST SERVO Shoulder
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(12, GPIO.OUT)
-pwmS = GPIO.PWM(12, 50)
-pwmS.start(7.5)
-
-
-##TEST SERVO Elbow
-GPIO.setup(23, GPIO.OUT)
-pwmE = GPIO.PWM(23, 50)
-pwmE.start(7.5)
-
-basePWM = 0 
-shoulderPWM = 0
-elbowPWM = 0
-    	
 class meArm():
     def __init__(self, sweepMinBase = 145, sweepMaxBase = 49, angleMinBase = -pi/4, angleMaxBase = pi/4,
     			 sweepMinShoulder = 118, sweepMaxShoulder = 22, angleMinShoulder = pi/4, angleMaxShoulder = 3*pi/4,
@@ -72,56 +46,8 @@ class meArm():
     
     def angle2pwm(self, servo, angle):
         """Work out pulse length to use to achieve a given requested angle taking into account stored calibration data"""
-        #Base rad [-1.09, 1.09] to mSec [1,2]
-        #OldRange = (OldMax - OldMin)
-        #NewRange = (NewMax - NewMin)
-        #NewValue = (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
-    	
-    	global basePWM, shoulderPWM, elbowPWM
-    	
-    	if( servo == "base"):
-	    	baseRadMin = -1.09
-	    	baseRadMax = 1.09
-	    	baseRadRange = baseRadMax - baseRadMin
-	    	basePWMmin = 2.5
-	    	basePWMmax = 10.0
-	    	basePWMrange = basePWMmax - basePWMmin
-	    	
-	    	basePWM = (( ( angle-baseRadMin )* basePWMrange)/ baseRadRange) + basePWMmin
-	    	print "basePWM: ",  basePWM
-	    	
-	    	pwmB.ChangeDutyCycle(basePWM)
-	    	
-    	if( servo == "shoulder"):
-	    	shoulderRadMin = 3.5
-	    	shoulderRadMax = 0.57
-	    	shoulderRadRange = shoulderRadMax - shoulderRadMin
-	    	shoulderPWMmin = 7.0
-	    	shoulderPWMmax = 11.0
-	    	shoulderPWMrange = shoulderPWMmax - shoulderPWMmin
-	    	
-	    	shoulderPWM = (( ( angle-shoulderRadMin )* shoulderPWMrange)/ shoulderRadRange) + shoulderPWMmin
-	    	print "shoulderPWM: ",  shoulderPWM
-	    	
-	    	pwmS.ChangeDutyCycle(shoulderPWM)
-    	
-    	ret = basePWM
-    	
-    	if( servo == "elbow"):
-	    	elbowRadMin = 1.35
-	    	elbowRadMax = -0.19
-	    	elbowRadRange = elbowRadMax - elbowRadMin
-	    	elbowPWMmin = 5.5
-	    	elbowPWMmax = 8.0
-	    	elbowPWMrange = elbowPWMmax - elbowPWMmin
-	    	
-	    	elbowPWM = (( ( angle-elbowRadMin )* elbowPWMrange)/ elbowRadRange) + elbowPWMmin
-	    	print "elbowPWM: ",  elbowPWM
-	    	
-	    	pwmE.ChangeDutyCycle(elbowPWM)
-    	
-    	ret = basePWM
-    	
+    	ret = 150 + int(0.5 + (self.servoInfo[servo]["zero"] + self.servoInfo[servo]["gain"] * angle) * 450 / 180)
+    	print "[%s] angle: %s --> PWM: %s" % (servo, angle, ret) 
     	return ret
     	
     def goDirectlyTo(self, x, y, z):
@@ -131,16 +57,14 @@ class meArm():
     		radBase = angles[0]
     		radShoulder = angles[1]
     		radElbow = angles[2]
-    		
-    		 
     		self.pwm.setPWM(self.base, 0, self.angle2pwm("base", radBase))
     		self.pwm.setPWM(self.shoulder, 0, self.angle2pwm("shoulder", radShoulder))
     		self.pwm.setPWM(self.elbow, 0, self.angle2pwm("elbow", radElbow))
     		self.x = x
     		self.y = y
     		self.z = z
+    		
     		print "goto %s, radians %s" % ([x,y,z], [radBase, radShoulder, radElbow])
-    		time.sleep(3)
     		
     def gotoPoint(self, x, y, z):
         """Travel in a straight line from current position to a requested position"""
@@ -155,7 +79,7 @@ class meArm():
     		time.sleep(0.05)
     		i += step
     	self.goDirectlyTo(x, y, z)
-    	time.sleep(3)
+    	time.sleep(0.05)
     	
     def openGripper(self):
         """Open the gripper, dropping whatever is being carried"""

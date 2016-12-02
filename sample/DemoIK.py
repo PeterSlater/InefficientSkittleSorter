@@ -11,9 +11,9 @@ def main():
     arm.begin()
  
     #test base
-    #arm.goDirectlyTo(-195, 100, 50)
-    #arm.goDirectlyTo(0, 200, 50)
-    #arm.goDirectlyTo(195, 100, 50)
+    arm.goDirectlyTo(-195, 100, 50)
+    arm.goDirectlyTo(0, 200, 50)
+    arm.goDirectlyTo(195, 100, 50)
 
     #test shoulder & elbow
     #arm.goDirectlyTo(0, 25, 50)
@@ -24,10 +24,11 @@ def main():
     #arm.goDirectlyTo(25, 25, 50)
     #arm.goDirectlyTo(0, 25, 50) 
     
-    arm.goDirectlyTo(0, 50, 50)
-    arm.goDirectlyTo(-25, 50, 50)
-    arm.goDirectlyTo(-50, 50, 50)
-    arm.goDirectlyTo(-75, 50, 50)
+    #move x
+    #arm.goDirectlyTo(0, 50, 50)
+    #arm.goDirectlyTo(-25, 50, 50)
+    #arm.goDirectlyTo(-50, 50, 50)
+    #arm.goDirectlyTo(-75, 50, 50)
     
     #move y
     #arm.gotoPoint(0, 50, 50)  

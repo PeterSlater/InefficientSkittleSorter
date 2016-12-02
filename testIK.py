@@ -12,9 +12,6 @@ pwm = GPIO.PWM(12, 50)
 pwm.start(7.5)
 
 
-def angle2pwm():
-	
-
 
 
 print "moving servo M, L, R"

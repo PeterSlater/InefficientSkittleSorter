@@ -22,7 +22,7 @@ import numpy as np
 #==================================
 #global variables
 #==================================
-global greenSkittleList, redSkittleList, state, armDoneSort
+global greenSkittleList, redSkittleList, state, armDoneSort, clawX, clawY
 
 greenSkittleList = []
 redSkittleList = []
@@ -30,6 +30,11 @@ redSkittleList = []
 state = 'IDLE'
 armDoneSort = 1
 
+#initiailize claw Position
+clawX = 290
+clawY = 360
+	
+	
 #==================================
 #class Skittles
 #==================================
@@ -71,7 +76,7 @@ def initCamera():
 	camera.framerate = 15
 	rawCapture = PiRGBArray(camera, size=(640,480))
 	#warm up the camera sensor
-	time.sleep(0.1)
+	time.sleep(0.5)
 
 
 #==================================
@@ -79,6 +84,8 @@ def initCamera():
 #==================================
 def imageProcess():
 	
+	global clawX, clawY
+		
 	#return list of detected skittle
 	detectedSkittleList = [] 
 	skittleColorCount = 0
@@ -94,15 +101,24 @@ def imageProcess():
 		
 		hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-		#threshold by color
+		#threshold by color for skittle and claw
 		mask = cv2.inRange(hsv, colorLB, colorUB)
+		maskClaw = cv2.inRange(hsv, greenLB, greenUB)
+		
 		
 		# morphlogical filter 
 		mask = cv2.erode(mask, None, iterations = 2)
 		mask = cv2.dilate(mask, None, iterations = 2)
-			
 		
-		# find contours from threshold
+		maskClaw = cv2.erode(maskClaw, None, iterations = 2)
+		maskClaw = cv2.dilate(maskClaw, None, iterations = 2)	
+		
+		#update clawX,Y with new or same coordinates
+		clawX, clawY = getCenter(maskClaw, clawX, clawY)
+		print "clawX: ", clawX,  "clawY: ", clawY
+		
+		
+		# find contours of skittle from threshold
 		contours = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 		
 
@@ -111,13 +127,13 @@ def imageProcess():
 		for c in contours:
 			
 			# only big enough size as valid
-			if cv2.contourArea(c) > 900:
+			if cv2.contourArea(c) > 100:
 			    # bound rectangle, w & h should be approx 1
 			    
 			    x,y,w,h = cv2.boundingRect(c)
 			    ratio = float(w)/h
 			    #print "ratio: " ,ratio
-			    if( ratio > 0.9 and ratio < 1.1):
+			    if( ratio > 0.5 and ratio < 1.5):
 
 					#print "size is: " , cv2.contourArea(c)
 					
@@ -126,7 +142,7 @@ def imageProcess():
 					cX = int(M["m10"]/M["m00"])
 					cY = int(M["m01"]/M["m00"])
 					
-					#print "X: " , cX, "Y: ", cY
+					print "X: " ,cX, "Y: ", cY
 					
 					#draw circle
 					cv2.drawContours(image, [c], -1, (0,255,255), 2)
@@ -153,22 +169,68 @@ def imageProcess():
 		if key == ord("q"):
 			break
 		
+		
 		# return 
 		return detectedSkittleList
+
+#==================================
+# return center (x,y) from Mat input 
+#==================================
+def getCenter( maskedFrame, previousX, previousY ):
+	
+	contours = cv2.findContours(maskedFrame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+	
+	#only update clawX,Y if 2 green spots detected
+	if (len(contours) == 2):
+		
+		#temp var to recalculate
+		X = 0
+		Y = 0
+		
+		for c in contours:	
+			# only big enough size as valid
+			if cv2.contourArea(c) > 100:
+				# bound rectangle, w & h should be approx 1
+				
+				x,y,w,h = cv2.boundingRect(c)
+				ratio = float(w)/h
+				#print "ratio: " ,ratio
+				if( ratio > 0.8 and ratio < 1.2):
+
+					#print "size is: " , cv2.contourArea(c)
+					
+					#recalculate  center 
+					M = cv2.moments(c)
+					X += int(M["m10"]/M["m00"])
+					Y += int(M["m01"]/M["m00"])	
+					
+		#get average for middle		
+		newClawX = X/2
+		newClawY = Y/2
+		
+		#compare with global value and update only if similar, else return same
+		if( ( abs(newClawX-previousX) + abs(newClawY-previousY) )  < 100 ):
+			return newClawX, newClawY
+			
+		else:
+			return previousX, previousY
+		
 
 
 #==================================
 # get input from keyboard
 #==================================
 def getColorInput():
-	global colorInput, colorLB, colorUB
+	global colorInput, colorLB, colorUB, greenLB, greenUB
 	
-	greenLB = (29,86,6)
-	greenUB = (64,255,255)
-	redLB = (140,50,50)
-	redUB = (200,255,255)
+	greenLB = (50,100,0)
+	greenUB = (100,255,140)
+	yellowLB = (5,30,100)
+	yellowUB = (140,182,170)
+	redLB = (169,136,103)
+	redUB = (179,225,206)
 	
-	print "Color Choices: [g,r]"
+	print "Color Choices: [g,r,y]"
 	
 	colorInput = raw_input("Color: ")
 	#print "selected: ", colorInput
@@ -187,6 +249,13 @@ def getColorInput():
 		colorLB = redLB
 		colorUB = redUB
 		colorInput = 'r'
+		
+	if(colorInput == 'y'):
+		print "looking for YELLOW skittles"
+		#set threshold range for yellow
+		colorLB = yellowLB
+		colorUB = yellowUB
+		colorInput = 'y'
 
 
 #==================================
@@ -212,7 +281,7 @@ def FSM():
 		getColorInput()
 		
 		#valid
-		if ((colorInput is 'g') or (colorInput is 'r')):
+		if ( (colorInput is 'g') or (colorInput is 'r') or (colorInput is 'y')):
 			state = 'INIT'
 		#invalid
 		else:
@@ -222,17 +291,19 @@ def FSM():
 	elif state == 'INIT':
 		print "INIT"
 		
-		if (colorInput is 'g'):
+		if ( (colorInput is 'g') or (colorInput is 'r') or (colorInput is 'y') ):
 			greenSkittleList = imageProcess()
-			if(len(greenSkittleList) != 0):
-				printSkittleList(greenSkittleList)
-				state = 'SORT'
+			#printSkittleList(greenSkittleList)
 			
-		elif (colorInput is 'r'):
-			redSkittleList = imageProcess()
-			if(len(redSkittleList) != 0):
-				printSkittleList(redSkittleList)
-				state = 'SORT'
+			#if(len(greenSkittleList) != 0):
+			#	printSkittleList(greenSkittleList)
+			#	state = 'SORT'
+			
+		#elif (colorInput is 'r'):
+			#redSkittleList = imageProcess()
+			#if(len(redSkittleList) != 0):
+				#printSkittleList(redSkittleList)
+				#state = 'SORT'
 			
 
 	#=======SORT========#	
@@ -243,7 +314,8 @@ def FSM():
 		
 		#change condition to include done state w/ ARM
 		if ( (len(tempSkittle) == 0) and (armDoneSort) ):
-			state = 'IDLE'
+			#state = 'IDLE'
+			pass
 			
 		else:
 			state = 'SORT'
