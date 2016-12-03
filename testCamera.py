@@ -23,9 +23,21 @@ import numpy as np
 #global variables
 #==================================
 global greenSkittleList, redSkittleList, state, armDoneSort, clawX, clawY
+global tempRedSkittleListPos, tempRedIncrement, medianPositions
 
 greenSkittleList = []
 redSkittleList = []
+tempRedIncrement = 0
+
+#defines
+clawGreenPixelSize = 100
+skittlePixelSize = 200 
+medianSize = 5
+numRedSkittle = 2 #CHANGE FOR DEMO
+
+#temp global var to hold live video update values
+tempRedSkittleListPos = [ [(0,0) for x in range(medianSize)] for y in range(numRedSkittle) ]
+medianPositions = [ [(0,0)] for y in range(numRedSkittle) ]  #[ (x,y) , (x,y) ]
 
 state = 'IDLE'
 armDoneSort = 1
@@ -34,9 +46,6 @@ armDoneSort = 1
 clawX = 290
 clawY = 360
 
-#defines
-clawGreenPixelSize = 100
-skittlePixelSize = 100 #set to 300 for demo
 
 #==================================
 #class Skittles
@@ -117,10 +126,11 @@ def imageProcess():
 		maskClaw = cv2.dilate(maskClaw, None, iterations = 2)	
 		
 		#update clawX,Y with new or same coordinates
-		clawX, clawY = getCenter(maskClaw, clawX, clawY)
-		print "clawX: ", clawX,  "clawY: ", clawY
+		if (maskClaw is not None):
+			getCenter(maskClaw)
+			#print "clawX: ", clawX,  "clawY: ", clawY
 		
-		
+
 		# find contours of skittle from threshold
 		contours = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 		
@@ -179,7 +189,9 @@ def imageProcess():
 #==================================
 # return center (x,y) from Mat input 
 #==================================
-def getCenter( maskedFrame, previousX, previousY ):
+def getCenter( maskedFrame ):
+	
+	global clawX, clawY
 	
 	contours = cv2.findContours(maskedFrame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 	
@@ -213,11 +225,12 @@ def getCenter( maskedFrame, previousX, previousY ):
 		newClawY = Y/2
 		
 		#compare with global value and update only if similar, else return same
-		if( ( abs(newClawX-previousX) + abs(newClawY-previousY) )  < 200 ):
-			return newClawX, newClawY
+		if( ( abs(newClawX-clawX) + abs(newClawY-clawY) )  < 200 ):
+			clawX =  newClawX
+			clawY =  newClawY
 			
 		else:
-			return previousX, previousY
+			pass
 		
 
 
@@ -275,7 +288,7 @@ def printSkittleList( inputList ):
 #==================================
 def FSM():
 	
-	global state, redSkittleList
+	global state, redSkittleList, tempRedSkittleList, tempRedIncrement, medianPositions
 	
 	#=======IDLE========#
 	if state == 'IDLE':
@@ -304,64 +317,73 @@ def FSM():
 				print "detected: ", len(redSkittleList), " red skittle"
 				
 				printSkittleList(redSkittleList)
-				state = 'SORT'
+				state = 'DETECT'
 			
 			else:
 				print "detected: 0 red skittle"
-				state = 'IDLE'
+				state = 'INIT'
 				
 
 			
 
-	#=======SORT========#	
-	elif state == 'SORT':
-		print "SORT"
+	#=======DETECT========#	
+	elif state == 'DETECT':
+		print "DETECT"
 		
+		tempSkittleList = imageProcess()
 		#TODO: call img process again and get updated temp X,Y and Claw
+		
 		
 		if ( (colorInput is 'r') ):
 			
-			#get x,y position of red skittles in the global list
-			for  skittle in  redSkittleList:
+			#store history of previous positions of detected red skittle
+			for i in range (len(tempSkittleList)):
+				tempRedSkittleListPos[i][tempRedIncrement % 5] = tempSkittleList[i].getPosition()
 				
+				#print "temp Pos" , tempRedSkittleListPos[i][tempRedIncrement % 5]	
+				#print "temp list" , tempRedSkittleListPos[i] 
 				
-				moveToPos = skittle.getPosition()
-				#print "position @ ", moveToPos
+				#sort to choose the median value
+				medianPositions[i] = sorted(tempRedSkittleListPos[i])[2]
+				#print "filtered val: " , medianPositions[i] 
 				
-				#get delta X,Y from claw to skittle
-				deltaX = moveToPos[0] - clawX  
-				deltaY = clawY - moveToPos[1]
-				#convert deltaX,Y from pixel to robot x,y
-				
-				print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
-
-				if(deltaX > 0 and deltaY > 0):
-					print "move rightup"
-				
-				elif(deltaX > 0 and deltaY < 0):
-					print "move rightdown"
-					
-				elif(deltaX < 0 and deltaY > 0):
-					print "move leftup"
-				
-				elif(deltaX < 0 and deltaY < 0):
-					print "move leftdown"
-				
-				else: print "unknown delta!"
-		
-		#sleep(1)
-		
-		#tempSkittle = imageProcess()
-		
-		##change condition to include done state w/ ARM
-		#if ( (len(tempSkittle) == 0) and (armDoneSort) ):
-			##state = 'IDLE'
-			#pass
+			#update for next frame
+			tempRedIncrement += 1	
 			
-		#else:
-			#state = 'SORT'
-	
+			## calculate deltaX,Y from 1st object detected (whichever has lowest y or closest to the arm in y)
+			moveToPos = medianPositions[0]
+			
+			deltaX = moveToPos[0] - clawX  
+			deltaY = clawY - moveToPos[1]
+			#convert deltaX,Y from pixel to robot x,y
+			
+			print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
 
+			if(deltaX > 0 and deltaY > 0):
+				print "move rightup"
+			
+			elif(deltaX > 0 and deltaY < 0):
+				print "move rightdown"
+				
+			elif(deltaX < 0 and deltaY > 0):
+				print "move leftup"
+			
+			elif(deltaX < 0 and deltaY < 0):
+				print "move leftdown"
+			
+			else: print "unknown delta!"
+		
+	
+	#=======MOVETO========#	
+	elif state == 'MOVETO':
+		print "MOVETO"
+
+
+
+	#=======MOVEOBJ========#	
+	elif state == 'MOVEOBJ':
+		print "MOVEOBJ"
+		
 			
 #==================================
 # main loop
