@@ -18,22 +18,38 @@ import cv2
 
 import sys
 import numpy as np
+import math
+
+#include for control and serial
+import mearm.control as arm
+import atexit
+import time
 
 #==================================
 #global variables
 #==================================
-global greenSkittleList, redSkittleList, state, armDoneSort, clawX, clawY
+global greenSkittleList, redSkittleList, yellowSkittleList, state, armDoneSort, clawX, clawY
 global tempRedSkittleListPos, tempRedIncrement, medianPositions
+global serial
+global deltaX, deltaY
 
+# Create the arm serial port
+serial = arm.init()
+	
 greenSkittleList = []
 redSkittleList = []
+yellowSkittleList = []
 tempRedIncrement = 0
+
+deltaX = 0
+deltaY = 0
 
 #defines
 clawGreenPixelSize = 100
 skittlePixelSize = 200 
 medianSize = 5
-numRedSkittle = 2 #CHANGE FOR DEMO
+numRedSkittle = 3 #CHANGE FOR DEMO
+close2Object = 10 #pixel radius
 
 #temp global var to hold live video update values
 tempRedSkittleListPos = [ [(0,0) for x in range(medianSize)] for y in range(numRedSkittle) ]
@@ -77,6 +93,15 @@ class Skittles(object):
 	
 	def printSkittle(self):
 		print ("color: %s | pos: %s | sort: %s" % (self.getColor(), self.getPosition(), self.getIsSorted()))
+
+
+#==================================
+# Always close the serial port on exit
+#==================================
+def close():
+	arm.close(serial)
+atexit.register(close)
+
 		
 #==================================
 #initialize camera
@@ -225,13 +250,15 @@ def getCenter( maskedFrame ):
 		newClawY = Y/2
 		
 		#compare with global value and update only if similar, else return same
-		if( ( abs(newClawX-clawX) + abs(newClawY-clawY) )  < 200 ):
+		if( ( abs(newClawX-clawX) + abs(newClawY-clawY) )  < 1000 ): #unused now
 			clawX =  newClawX
 			clawY =  newClawY
 			
 		else:
 			pass
 		
+	else:
+		print "no claw detected"
 
 
 #==================================
@@ -240,14 +267,18 @@ def getCenter( maskedFrame ):
 def getColorInput():
 	global colorInput, colorLB, colorUB, greenLB, greenUB
 	
+	#CLAW value
 	greenLB = (50,100,0)
 	greenUB = (100,255,140)
-	yellowLB = (5,40,100)
-	yellowUB = (110,152,150)
+	
+	yellowLB = (10,50,100)
+	yellowUB = (80,230,230)
+	
 	redLB = (169,136,103)
 	redUB = (179,225,206)
+
 	
-	print "Color Choices: [g,r,y]"
+	print "Color Choices: [g,r,y ]"
 	
 	colorInput = raw_input("Color: ")
 	#print "selected: ", colorInput
@@ -273,6 +304,7 @@ def getColorInput():
 		colorLB = yellowLB
 		colorUB = yellowUB
 		colorInput = 'y'
+		
 
 
 #==================================
@@ -288,11 +320,17 @@ def printSkittleList( inputList ):
 #==================================
 def FSM():
 	
-	global state, redSkittleList, tempRedSkittleList, tempRedIncrement, medianPositions
+	global state, redSkittleList, yellowSkittleList, tempRedSkittleList, tempRedIncrement, medianPositions
+	global deltaX, deltaY
+	global clawX, clawY
 	
 	#=======IDLE========#
 	if state == 'IDLE':
 		print "IDLE"
+		
+		# Send arm to the home posistion
+		arm.home(serial)
+		time.sleep(1)
 		
 		#get valid input to move to INIT, else stay in IDLE
 		getColorInput()
@@ -321,8 +359,21 @@ def FSM():
 			
 			else:
 				print "detected: 0 red skittle"
-				state = 'INIT'
+				state = 'IDLE'
+		
+		if ( (colorInput is 'y') ):
+			yellowSkittleList = imageProcess()
+		
+			
+			if(len(yellowSkittleList) != 0):
+				print "detected: ", len(yellowSkittleList), " yellow skittle"
 				
+				printSkittleList(yellowSkittleList)
+				state = 'DETECT'
+			
+			else:
+				print "detected: 0 yellow skittle"
+				state = 'IDLE'
 
 			
 
@@ -331,66 +382,137 @@ def FSM():
 		print "DETECT"
 		
 		tempSkittleList = imageProcess()
-		#TODO: call img process again and get updated temp X,Y and Claw
+	
+		#store history of previous positions of detected red skittle
+		for i in range (len(tempSkittleList)):
+			tempRedSkittleListPos[i][tempRedIncrement % 5] = tempSkittleList[i].getPosition()
+			
+			#print "temp Pos" , tempRedSkittleListPos[i][tempRedIncrement % 5]	
+			#print "temp list" , tempRedSkittleListPos[i] 
+			
+			#sort to choose the median value
+			medianPositions[i] = sorted(tempRedSkittleListPos[i])[2]
+			#print "filtered val: " , medianPositions[i] 
+			
+		#update for next frame
+		tempRedIncrement += 1	
 		
+		## calculate deltaX,Y from 1st object detected (whichever has lowest y or closest to the arm in y)
 		
-		if ( (colorInput is 'r') ):
+		##dynamic: median filter skittle during run-time
+		#moveToPos = medianPositions[0]  
+		#print "skittle at: ", moveToPos
+		
+		if(  (colorInput is 'r') ):
+			#static: no median filter, just on first capture
+			moveToPos = redSkittleList[0].getPosition()
+			#print "skittle at: ", moveToPos[0], moveToPos[1]
+		
+		elif(  (colorInput is 'y') ):
+			#static: no median filter, just on first capture
+			moveToPos = yellowSkittleList[0].getPosition()
+			print "skittle at: ", moveToPos[0], moveToPos[1]
 			
-			#store history of previous positions of detected red skittle
-			for i in range (len(tempSkittleList)):
-				tempRedSkittleListPos[i][tempRedIncrement % 5] = tempSkittleList[i].getPosition()
-				
-				#print "temp Pos" , tempRedSkittleListPos[i][tempRedIncrement % 5]	
-				#print "temp list" , tempRedSkittleListPos[i] 
-				
-				#sort to choose the median value
-				medianPositions[i] = sorted(tempRedSkittleListPos[i])[2]
-				#print "filtered val: " , medianPositions[i] 
-				
-			#update for next frame
-			tempRedIncrement += 1	
+		
+		deltaX = int(moveToPos[0]) - int(clawX)  
+		deltaY = int(clawY) - int(moveToPos[1])
+		
+		distanceClaw2Obj = int(math.sqrt(deltaX*deltaX + deltaY*deltaY))
+		#print "abs dist: ", distanceClaw2Obj
+		
+		#determine next state to keep closing in on target
+		if ( distanceClaw2Obj < close2Object): 
+			print "claw arrived at skittle"
+			state = 'MOVEOBJ'
 			
-			## calculate deltaX,Y from 1st object detected (whichever has lowest y or closest to the arm in y)
-			moveToPos = medianPositions[0]
+		else:
+			state = 'MOVETO'
+		
 			
-			deltaX = moveToPos[0] - clawX  
-			deltaY = clawY - moveToPos[1]
-			#convert deltaX,Y from pixel to robot x,y
-			
-			print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
-
-			if(deltaX > 0 and deltaY > 0):
-				print "move rightup"
-			
-			elif(deltaX > 0 and deltaY < 0):
-				print "move rightdown"
-				
-			elif(deltaX < 0 and deltaY > 0):
-				print "move leftup"
-			
-			elif(deltaX < 0 and deltaY < 0):
-				print "move leftdown"
-			
-			else: print "unknown delta!"
 		
 	
 	#=======MOVETO========#	
 	elif state == 'MOVETO':
 		print "MOVETO"
-
+		
+		print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
+		if(deltaX > 0 and deltaY > 0):
+			print "move rightup"
+			arm.stepX(serial, 3)
+			arm.stepY(serial, 3)
+			
+		elif(deltaX > 0 and deltaY < 0):
+			print "move rightdown"
+			arm.stepX(serial, 3)
+			arm.stepY(serial, -3)
+			
+		elif(deltaX < 0 and deltaY > 0):
+			print "move leftup"
+			arm.stepX(serial, -3)
+			arm.stepY(serial, 3)
+			
+		elif(deltaX < 0 and deltaY < 0):
+			print "move leftdown"
+			arm.stepX(serial, -3)
+			arm.stepY(serial, -3)
+		
+		else: print " delta is 0"
+			
+		#always return to detect state after incremental movement
+		state = 'DETECT'
 
 
 	#=======MOVEOBJ========#	
 	elif state == 'MOVEOBJ':
 		print "MOVEOBJ"
 		
+		print "GRABBING SKITTLE!"
+		#increase radius for better grasp
+		arm.stepR(serial, 5)
+		sleep(1)
+		#move down z
+		arm.setZ(serial, -30)
+		sleep(1)
+		#close claw
+		arm.setC(serial, 0)
+		sleep(1)
+		#move up z
+		arm.setZ(serial, 0)
+		sleep(1)
+		#move to home
+		arm.home(serial)
+		sleep(1)
+		#move to sort basket
+		if( (colorInput is 'r') ):
+			arm.setTheta(serial, 10)
+			sleep(1)
+		elif( (colorInput is 'y') ):
+			arm.setTheta(serial, 170)
+			sleep(1)
+				
 			
+		#open claw
+		arm.setC(serial, 50)
+		sleep(1)
+		
+		
+		#reset values to recalculate 
+		tempRedSkittleListPos[0] = [(0,0), (0,0), (0,0),(0,0),(0,0)]
+		clawX = 290
+		clawY = 360
+		state = 'IDLE'
+		
+
+
+		
 #==================================
 # main loop
 #==================================
 def main():
 	print "STARTING VISION CODE"
+	
 	initCamera()
+	
 	
 	print "entering FSM"
 	

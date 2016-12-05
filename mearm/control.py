@@ -59,6 +59,12 @@ def stepY(ser, h):
 	ser.write('h ' + str(h) + '\n')
 	time.sleep(DELAY)
 
+# Step the R coordinate
+def stepR(ser, r):
+	ser.write('r ' + str(r) + '\n')
+	time.sleep(DELAY)
+
+
 # Read the current posistion of the arm
 def posistion(ser, timeout):
 	start = time.time()
