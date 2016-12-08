@@ -19,24 +19,24 @@ arm.setTheta(ser, 0)
 time.sleep(1)
 arm.setR(ser, 100)
 time.sleep(1)
-arm.setZ(ser, -30)
+arm.setZ(ser, -25)
 time.sleep(1)
 arm.setC(ser, 0)
 time.sleep(1)
-arm.setZ(ser, 0)
+arm.setZ(ser, 50)
 time.sleep(1)
 arm.setY(ser, 75)
 arm.setX(ser, 0)
 time.sleep(1)
 
+
+count = 0
 while True:
-	pos = arm.posistion(ser, 2)
-	print pos
-	
 	arm.stepY(ser, 3)
 	arm.stepX(ser, 3)
+	count += 1
 	
-	if(pos[5] == 129.0):
+	if(count >= 54 / 3):
 		arm.setC(ser, 50)
 		arm.home(ser)
 		exit(0)

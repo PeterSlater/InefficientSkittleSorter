@@ -46,7 +46,7 @@ deltaY = 0
 
 #defines
 clawGreenPixelSize = 100
-skittlePixelSize = 200 
+skittlePixelSize = 150 
 medianSize = 5
 numRedSkittle = 3 #CHANGE FOR DEMO
 close2Object = 10 #pixel radius
@@ -171,7 +171,7 @@ def imageProcess():
 			    x,y,w,h = cv2.boundingRect(c)
 			    ratio = float(w)/h
 			    #print "ratio: " ,ratio
-			    if( ratio > 0.5 and ratio < 1.5):
+			    if( ratio > 0.25 and ratio < 2):
 
 					#print "size is: " , cv2.contourArea(c)
 					
@@ -221,7 +221,7 @@ def getCenter( maskedFrame ):
 	contours = cv2.findContours(maskedFrame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 	
 	#only update clawX,Y if 2 green spots detected
-	if (len(contours) == 2):
+	if (len(contours) >= 2):
 		
 		#temp var to recalculate
 		X = 0
@@ -375,11 +375,14 @@ def FSM():
 				print "detected: 0 yellow skittle"
 				state = 'IDLE'
 
+		if ( (colorInput is 'g') ):
+			greenkittleList = imageProcess()
+			#printSkittleList(redSkittleList)
 			
 
 	#=======DETECT========#	
 	elif state == 'DETECT':
-		print "DETECT"
+		#print "DETECT"
 		
 		tempSkittleList = imageProcess()
 	
@@ -411,13 +414,15 @@ def FSM():
 		elif(  (colorInput is 'y') ):
 			#static: no median filter, just on first capture
 			moveToPos = yellowSkittleList[0].getPosition()
-			print "skittle at: ", moveToPos[0], moveToPos[1]
+			#print "skittle at: ", moveToPos[0], moveToPos[1]
 			
 		
 		deltaX = int(moveToPos[0]) - int(clawX)  
 		deltaY = int(clawY) - int(moveToPos[1])
 		
 		distanceClaw2Obj = int(math.sqrt(deltaX*deltaX + deltaY*deltaY))
+		
+		print "State: %s | deltaX: %d | deltaY: %d | distance: %d" % (state, deltaX, deltaY, distanceClaw2Obj) 
 		#print "abs dist: ", distanceClaw2Obj
 		
 		#determine next state to keep closing in on target
@@ -433,26 +438,30 @@ def FSM():
 	
 	#=======MOVETO========#	
 	elif state == 'MOVETO':
-		print "MOVETO"
+		#print "MOVETO"
 		
-		print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
+		#print "deltaX: %d deltaY: %d" % (deltaX, deltaY) 
 		if(deltaX > 0 and deltaY > 0):
-			print "move rightup"
+			print "State: %s | command: move rightup" % (state) 
+			#print "move rightup"
 			arm.stepX(serial, 3)
 			arm.stepY(serial, 3)
 			
 		elif(deltaX > 0 and deltaY < 0):
-			print "move rightdown"
+			print "State: %s | command: move rightdown" % (state) 
+			#print "move rightdown"
 			arm.stepX(serial, 3)
 			arm.stepY(serial, -3)
 			
 		elif(deltaX < 0 and deltaY > 0):
-			print "move leftup"
+			print "State: %s | command: move leftup" % (state) 
+			#print "move leftup"
 			arm.stepX(serial, -3)
 			arm.stepY(serial, 3)
 			
 		elif(deltaX < 0 and deltaY < 0):
-			print "move leftdown"
+			print "State: %s | command: move leftdown" % (state) 
+			#print "move leftdown"
 			arm.stepX(serial, -3)
 			arm.stepY(serial, -3)
 		
@@ -471,7 +480,7 @@ def FSM():
 		arm.stepR(serial, 5)
 		sleep(1)
 		#move down z
-		arm.setZ(serial, -30)
+		arm.setZ(serial, -25)
 		sleep(1)
 		#close claw
 		arm.setC(serial, 0)
@@ -479,22 +488,30 @@ def FSM():
 		#move up z
 		arm.setZ(serial, 0)
 		sleep(1)
+		
 		#move to home
-		arm.home(serial)
+		arm.setZ(serial, 30)
+		arm.setR(serial, 80)
+		arm.setTheta(serial, 90)
 		sleep(1)
+		
 		#move to sort basket
 		if( (colorInput is 'r') ):
-			arm.setTheta(serial, 10)
+			arm.setTheta(serial, 15)
 			sleep(1)
 		elif( (colorInput is 'y') ):
-			arm.setTheta(serial, 170)
+			arm.setTheta(serial, 190)
 			sleep(1)
 				
-			
 		#open claw
 		arm.setC(serial, 50)
 		sleep(1)
 		
+		#move to home
+		arm.setZ(serial, 30)
+		arm.setR(serial, 75)
+		arm.setTheta(serial, 90)
+		sleep(1)
 		
 		#reset values to recalculate 
 		tempRedSkittleListPos[0] = [(0,0), (0,0), (0,0),(0,0),(0,0)]

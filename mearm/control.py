@@ -4,12 +4,13 @@ import time
 # How long it takes to send a command
 DELAY = 0.05
 
-# Initialize the serial port for the arm
+# Initialize the serial port for the arm, ttyACM0 or ttyUSB0
 def init():
-	return serial.Serial('/dev/ttyACM0', 9600, timeout=0)
+	return serial.Serial('/dev/ttyUSB0', 9600, timeout=0)
 
 # Move the arm to the home posistion
 def home(ser):
+	setC(ser, 50)
 	setZ(ser, 0)
 	setR(ser, 75)
 	setTheta(ser, 90)
@@ -20,64 +21,64 @@ def close(ser):
 
 # Set the theta coordinate 
 def setTheta(ser, theta):
-	ser.write('o ' + str(theta) + '\n')
+	ser.write('o ' + str(theta) + '\r\n')
 	
 	time.sleep(DELAY)
 
 # Set the R coordinate
 def setR(ser, r):
-	ser.write('r ' + str(r) + '\n')
+	ser.write('r ' + str(r) + '\r\n')
 	time.sleep(DELAY)
 
 # Set the Z coordinate
 def setZ(ser, z):
-	ser.write('z ' + str(z) + '\n')
+	ser.write('z ' + str(z) + '\r\n')
 	time.sleep(DELAY)
 	
 # Set the C coordinate
 def setC(ser, c):
-	ser.write('c ' + str(c) + '\n')
+	ser.write('c ' + str(c) + '\r\n')
 	time.sleep(DELAY)
 
 # Set the X coordinate
 def setX(ser, x):
-	ser.write('x ' + str(x) + '\n')
+	ser.write('x ' + str(x) + '\r\n')
 	time.sleep(DELAY)
 
 # Set the Y coordinate
 def setY(ser, y):
-	ser.write('y ' + str(y) + '\n')
+	ser.write('y ' + str(y) + '\r\n')
 	time.sleep(DELAY)
 
 # Step the X coordinate
 def stepX(ser, w):
-	ser.write('w ' + str(w) + '\n')
+	ser.write('w ' + str(w) + '\r\n')
 	time.sleep(DELAY)
 
 # Step the Y coordinate
 def stepY(ser, h):
-	ser.write('h ' + str(h) + '\n')
+	ser.write('h ' + str(h) + '\r\n')
 	time.sleep(DELAY)
 
 # Step the R coordinate
 def stepR(ser, r):
-	ser.write('r ' + str(r) + '\n')
+	ser.write('r ' + str(r) + '\r\n')
 	time.sleep(DELAY)
 
 
 # Read the current posistion of the arm
-def posistion(ser, timeout):
+def position(ser, timeout):
 	start = time.time()
 	
 	# send the command and wait for a response
-	ser.write('v 0.0\n')
+	ser.write('v 0.0\r\n')
 	
 	while True:
-		time.sleep(0.1)
+		time.sleep(0.2)
 		temp = ser.readline();
 		
 		# parse the float values
-		vals = []	
+		vals = [-1.0]	
 		for t in temp.split():
 			try:
 				vals.append(float(t))
