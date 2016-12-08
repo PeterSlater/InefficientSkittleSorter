@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name ece4760)(type KiCad)(uri "E:\\Users\\Peter\\Documents\\College\\ECE 4760\\Labs\\Lab5\\Kicad\\library\\ece4760.pretty")(options "")(descr ""))
+  (lib (name freetronics_footprints)(type KiCad)(uri "C:\\Users\\Peter\\Documents\\KiCad Projects\\DynamixelShield\\library\\freetronics_kicad_library\\freetronics_footprints.pretty")(options "")(descr ""))
+)
